@@ -1,0 +1,5 @@
+DB_HOST= host
+DB_NAME= nombreDB
+DB_USER= user
+DB_PASSWORD = Upassword
+DB_PORT= 8000

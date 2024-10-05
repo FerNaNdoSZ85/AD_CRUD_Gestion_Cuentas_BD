@@ -1,6 +1,5 @@
 import mysql.connector
 from mysql.connector import Error
-import json
 from decouple import config
 
 
@@ -101,99 +100,170 @@ class GestionCuentas:
             if connection.is_connected():
                 return connection
         except Error as e:
-            print('Error al conectar con la Base de Datos: {e}')
+            print(f'Error al conectar con la Base de Datos: {e}')
             return None
 
-    def crear_cuenta(self,cuenta): #! Funcionando: revisar esta funcion para cuentas multiples para un mismo DNI
-            try:
-                connection = self.connect()
-                if connection:
-                    with connection.cursor() as cursor:
-                    #? verifico si la existe alguna cuenta con ese DNI
-                        cursor.execute('SELECT dni FROM clientes WHERE dni = %s', (cuenta.dni,))
-                        if cursor.fetchone():
-                            print(f'Este cliente {cuenta.dni} ya posee una cuenta')
-                            return
-
-                        if isinstance(cuenta, CuentaAhorro):
-                            query='''
-                            INSERT INTO clientes (dni,titular)
-                            VALUES (%s, %s)
-                            '''
-                            cursor.execute(query,(cuenta.dni,cuenta.titular))
-                            query='''
-                            INSERT INTO cuentaahorro (dni, num_cuenta, saldo, tipo_cuenta)
-                            VALUES (%s,%s,%s,%s)
-                            '''
-                            cursor.execute(query,(cuenta.dni,cuenta.num_cuenta,cuenta.saldo,cuenta.cta_ahorro))
-                        
-                        elif isinstance (cuenta, CuentaCorriente):
-                            query='''
-                            INSERT INTO clientes (dni,titular)
-                            VALUES (%s, %s)
-                            '''
-                            cursor.execute(query,(cuenta.dni,cuenta.titular))
-                            query='''
-                            INSERT INTO cuentacorriente (dni, num_cuenta, saldo, tipo_cuenta)
-                            VALUES (%s,%s,%s,%s)
-                            '''
-                            cursor.execute(query,(cuenta.dni,cuenta.num_cuenta,cuenta.saldo,cuenta.cta_corriente))
-                        
-                        connection.commit()
-                        print('**** Cuenta Creada Existosamente! ****')
-                        
-            except Exception as error:
-                print(f'Error al intentar crear la cuenta: {error}')
-
-    def leer_cuentas(self,dni): #! Lanza un error cuando el cliente posee solo una cuenta
+    def crear_cuenta(self, cuenta):
         try:
             connection = self.connect()
             if connection:
-                with connection.cursor(dictionary=True) as cursor:
-                    cursor.execute('SELECT * FROM clientes WHERE dni = %s', (dni,))
-                    cuenta_existente = cursor.fetchone()
+                with connection.cursor() as cursor:
+                    # Verifico si existe algún cliente con ese DNI
+                    cursor.execute('SELECT id_cliente FROM clientes WHERE dni = %s', (cuenta.dni,))
+                    cliente = cursor.fetchone()
 
-                    if cuenta_existente:
-                        cursor.execute('SELECT * FROM cuentaahorro WHERE dni = %s', (dni,))
-                        cuentas_ahorros = cursor.fetchone()
+                    if cliente:
+                        id_cliente = cliente[0]  # Obtener el id_cliente
+                        print(f'Este cliente {cuenta.dni} ya posee una cuenta.')
+                        agregar_cta = input('Desea agregar cuenta al mismo cliente? 1 - SI   <===> 2 - NO: ')
 
-                        cursor.execute('SELECT * FROM cuentacorriente WHERE dni = %s', (dni,))
-                        cuentas_corrientes = cursor.fetchone()
-                                                                                                                # agrego cta_cte y se cae
-                        print(cuenta_existente['dni'],cuenta_existente['titular'], cuentas_ahorros['tipo_cuenta'])#,cuentas_corrientes['tipo_cuenta'])
+                        if agregar_cta == '1':
+                            cuenta_ac = input('Seleccione tipo de cuenta: 1 - Cta. Ahorro <===> 2 - Cta. Corriente: ').upper()
 
-        except Error as e:
-            print(f'Error al buscar los datos en la base de datos {e}')
-        finally:
-            if connection.is_connected():
-                connection.close()
+                            if cuenta_ac == '1':
+                                if isinstance(cuenta, CuentaAhorro):
+                                    query = '''
+                                    INSERT INTO cuentas_ahorro (id_cliente, num_cuenta, saldo, tipo_cuenta)
+                                    VALUES (%s, %s, %s, %s)
+                                    '''
+                                    cursor.execute(query, (id_cliente, cuenta.num_cuenta, cuenta.saldo, cuenta.cta_ahorro))
+                                    print(f'Cuenta de AHORRO agregada para el cliente {cuenta.titular}.')
 
-    def actualizar_saldo(self,dni,saldo): #! <--- aca estoy, no hay error, pero no actualiza la base de datos
+                            elif cuenta_ac == '2':
+                                if isinstance(cuenta, CuentaCorriente):
+                                    query = '''
+                                    INSERT INTO cuentas_corriente (id_cliente, num_cuenta, saldo, tipo_cuenta)
+                                    VALUES (%s, %s, %s, %s)
+                                    '''
+                                    cursor.execute(query, (id_cliente, cuenta.num_cuenta, cuenta.saldo, cuenta.cta_corriente))
+                                    print(f'Cuenta CORRIENTE agregada para el cliente {cuenta.titular}.')
+                        
+                        elif agregar_cta == '2':
+                            print('OPCION FINALIZADA - SALIDA DEL COMANDO \n')
+                            return
+
+                    else:
+                        # cuando el cliente no existe lo agrego
+                        query = '''
+                        INSERT INTO clientes (dni, titular)
+                        VALUES (%s, %s)
+                        '''
+                        cursor.execute(query, (cuenta.dni, cuenta.titular))
+                        id_cliente = cursor.lastrowid  # Recupero el id_cliente del cliente
+
+                        if isinstance(cuenta, CuentaAhorro):
+                            query = '''
+                            INSERT INTO cuentas_ahorro (id_cliente, num_cuenta, saldo, tipo_cuenta)
+                            VALUES (%s, %s, %s, %s)
+                            '''
+                            cursor.execute(query, (id_cliente, cuenta.num_cuenta, cuenta.saldo, cuenta.cta_ahorro))
+                            print(f'Cuenta de ahorro creada para el nuevo cliente {cuenta.dni}.')
+
+                        elif isinstance(cuenta, CuentaCorriente):
+                            query = '''
+                            INSERT INTO cuentas_corriente (id_cliente, num_cuenta, saldo, tipo_cuenta)
+                            VALUES (%s, %s, %s, %s)
+                            '''
+                            cursor.execute(query, (id_cliente, cuenta.num_cuenta, cuenta.saldo, cuenta.cta_corriente))
+                            print(f'Cuenta corriente creada para el nuevo cliente {cuenta.dni}.')
+
+                connection.commit()
+                print(f'**** La cuenta de {cuenta.titular} creada exitosamente! ****')
+
+        except Exception as error:
+            print(f'Error al intentar crear la cuenta: {error}')
+
+    def leer_cuentas(self, dni):
         try:
-            connection=self.connect()
+            connection = self.connect()
             if connection:
                 with connection.cursor() as cursor:
-                    cursor.execute('SELECT * FROM clientes WHERE dni = %s',(dni,))
-                    seleccion = input('Que tipo de Cuenta desea Actualizar:  1 - Cta. Ahorro <==> 2 - Cta. Corriente: ')
+                    # Consulta combinada para cuentas de ahorro y corrientes incluyendo el titular
+                    query = '''
+                    SELECT 'Ahorro' AS tipo_cuenta, c.titular, ca.num_cuenta, ca.saldo 
+                    FROM cuentas_ahorro ca
+                    JOIN clientes c ON ca.id_cliente = c.id_cliente
+                    WHERE c.dni = %s
 
-                    if not cursor.fetchone():
-                        print(f'No existe cuenta para actualizar: {dni}')
-                        return
+                    UNION ALL
 
-                    if seleccion == 1:
-                        cursor.execute('UPDATE cuentaahorro SET saldo = %s WHERE dni = %s', (saldo,dni))
-                    elif seleccion == 2:
-                        cursor.execute('UPDATE cuentacorriente SET saldo = %s WHERE dni = %s', (saldo,dni))
+                    SELECT 'Corriente' AS tipo_cuenta, c.titular, cc.num_cuenta, cc.saldo 
+                    FROM cuentas_corriente cc
+                    JOIN clientes c ON cc.id_cliente = c.id_cliente
+                    WHERE c.dni = %s;
+                    '''
+                    
+                    cursor.execute(query, (dni, dni))
+                    cuentas = cursor.fetchall()
 
-                    if cursor.rowcount >0:
-                        connection.commit()
-                        print('El saldo se ha actualizado correctamente')
+                    # Mostrar resultados
+                    if cuentas:
+                        print(f'Cuentas para el cliente con DNI {dni}:\n')
+                        for cuenta in cuentas:
+                            print(f'Tipo de cuenta: {cuenta[0]}, Titular: {cuenta[1]}, Número de cuenta: {cuenta[2]}, Saldo: {cuenta[3]}')
                     else:
-                        print('No se puede actualizar la cuenta')
+                        print(f'No se encontraron cuentas para el cliente con DNI {dni}.')
 
-        except Error as e:
-            print('Error al actualizar datos: {e}')
-        finally:
-            if connection.is_connected():
-                connection.close()
+        except Exception as error:
+            print(f'Error al intentar listar las cuentas: {error}')
+
+    def actualizar_saldo(self):
+        try:
+            connection = self.connect()
+            if connection:
+                with connection.cursor() as cursor:
+                    # Paso 1: Ingresar el DNI del cliente
+                    dni = input("Ingrese el DNI del cliente: ")
+
+                    # Paso 2: Consultar las cuentas asociadas al DNI
+                    query = '''
+                    SELECT ca.id_cuenta, ca.num_cuenta, ca.saldo, ca.tipo_cuenta
+                    FROM cuentas_ahorro ca
+                    JOIN clientes c ON ca.id_cliente = c.id_cliente
+                    WHERE c.dni = %s
+                    UNION ALL
+                    SELECT cc.id_cuenta, cc.num_cuenta, cc.saldo , cc.tipo_cuenta
+                    FROM cuentas_corriente cc
+                    JOIN clientes c ON cc.id_cliente = c.id_cliente
+                    WHERE c.dni = %s;
+                    '''
+                    cursor.execute(query, (dni, dni))
+                    cuentas = cursor.fetchall()
+
+                    # Paso 3: Mostrar las cuentas encontradas
+                    if cuentas:
+                        print(f'Cuentas para el cliente con DNI {dni}:\n')
+                        for cuenta in cuentas:
+                            print(f'ID Cuenta: {cuenta[0]}, Número de cuenta: {cuenta[1]}, Saldo: {cuenta[2]}, Cuenta tipo: {cuenta[3]}')
+
+                        # Paso 4: Seleccionar la cuenta a modificar
+                        id_cuenta_seleccionada = input("Ingrese el ID de la cuenta que desea modificar: ")
+
+                        # Paso 5: Ingresar el nuevo saldo
+                        nuevo_saldo = float(input("Ingrese el nuevo saldo: "))
+
+                        # Paso 6: Actualizar el saldo en la tabla correspondiente
+                        # Verificar en qué tabla se encuentra la cuenta seleccionada
+                        query = '''
+                        UPDATE cuentas_ahorro
+                        SET saldo = %s
+                        WHERE id_cuenta = %s;
+                        '''
+                        cursor.execute(query, (nuevo_saldo, id_cuenta_seleccionada))
+
+                        if cursor.rowcount == 0:  # Si no se actualizó, podría estar en cuentas_corrientes
+                            query = '''
+                            UPDATE cuentas_corriente
+                            SET saldo = %s
+                            WHERE id_cuenta = %s;
+                            '''
+                            cursor.execute(query, (nuevo_saldo, id_cuenta_seleccionada))
+
+                        connection.commit()
+                        print('**** Saldo actualizado exitosamente! ****')
+                    else:
+                        print(f'No se encontraron cuentas para el cliente con DNI {dni}.')
+
+        except Exception as error:
+            print(f'Error al intentar actualizar el saldo: {error}')
 
