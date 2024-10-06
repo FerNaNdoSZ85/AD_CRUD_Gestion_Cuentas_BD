@@ -212,10 +212,10 @@ class GestionCuentas:
             connection = self.connect()
             if connection:
                 with connection.cursor() as cursor:
-                    # Paso 1: Ingresar el DNI del cliente
+                    # Ingresar el DNI del cliente
                     dni = input("Ingrese el DNI del cliente: ")
 
-                    # Paso 2: Consultar las cuentas asociadas al DNI
+                    # Consultar las cuentas asociadas al DNI
                     query = '''
                     SELECT ca.id_cuenta, ca.num_cuenta, ca.saldo, ca.tipo_cuenta
                     FROM cuentas_ahorro ca
@@ -230,19 +230,18 @@ class GestionCuentas:
                     cursor.execute(query, (dni, dni))
                     cuentas = cursor.fetchall()
 
-                    # Paso 3: Mostrar las cuentas encontradas
                     if cuentas:
                         print(f'Cuentas para el cliente con DNI {dni}:\n')
                         for cuenta in cuentas:
                             print(f'ID Cuenta: {cuenta[0]}, Número de cuenta: {cuenta[1]}, Saldo: {cuenta[2]}, Cuenta tipo: {cuenta[3]}')
 
-                        # Paso 4: Seleccionar la cuenta a modificar
+                        # Seleccionar la cuenta a modificar
                         id_cuenta_seleccionada = input("Ingrese el ID de la cuenta que desea modificar: ")
 
-                        # Paso 5: Ingresar el nuevo saldo
+                        # Ingresar el nuevo saldo
                         nuevo_saldo = float(input("Ingrese el nuevo saldo: "))
 
-                        # Paso 6: Actualizar el saldo en la tabla correspondiente
+                        # Actualizar el saldo en la tabla correspondiente
                         # Verificar en qué tabla se encuentra la cuenta seleccionada
                         query = '''
                         UPDATE cuentas_ahorro
@@ -251,7 +250,7 @@ class GestionCuentas:
                         '''
                         cursor.execute(query, (nuevo_saldo, id_cuenta_seleccionada))
 
-                        if cursor.rowcount == 0:  # Si no se actualizó, podría estar en cuentas_corrientes
+                        if cursor.rowcount == 0:
                             query = '''
                             UPDATE cuentas_corriente
                             SET saldo = %s
@@ -262,8 +261,35 @@ class GestionCuentas:
                         connection.commit()
                         print('**** Saldo actualizado exitosamente! ****')
                     else:
-                        print(f'No se encontraron cuentas para el cliente con DNI {dni}.')
+                        print(f'No se encontraron cuentas para el cliente con DNI {dni}. \n')
 
         except Exception as error:
             print(f'Error al intentar actualizar el saldo: {error}')
 
+    def listar_todas_las_cuentas(self):
+        try:
+            connection = self.connect()
+            if connection:
+                with connection.cursor() as cursor:
+                    # Consulta para traer todas las cuentas (ahorro y corriente) de todos los clientes
+                    query = '''
+                    SELECT c.dni, c.titular, ca.num_cuenta, ca.saldo, ca.tipo_cuenta
+                    FROM cuentas_ahorro ca
+                    JOIN clientes c ON ca.id_cliente = c.id_cliente
+                    UNION ALL
+                    SELECT c.dni, c.titular, cc.num_cuenta, cc.saldo, cc.tipo_cuenta
+                    FROM cuentas_corriente cc
+                    JOIN clientes c ON cc.id_cliente = c.id_cliente;
+                    '''
+                    cursor.execute(query)
+                    cuentas = cursor.fetchall()
+
+                    # Verificar si hay cuentas
+                    if cursor.rowcount() > 0 :
+                        print(f'Listado de todas las cuentas existentes:\n')
+                        for cuenta in cuentas:
+                            print(f'DNI: {cuenta[0]}, Titular: {cuenta[1]}, Número de cuenta: {cuenta[2]}, Saldo: {cuenta[3]}, Tipo de cuenta: {cuenta[4]}')
+                    else:
+                        print('No se encontraron cuentas en el sistema.')
+        except Exception as error:
+            print(f'Error al intentar listar las cuentas: {error}')

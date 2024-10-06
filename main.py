@@ -6,8 +6,8 @@ def mostrar_menu():
     print('2 - Buscar cuentas por DNI ')
     print('3 - Actualizar Saldo de Cuenta')
     print('4 - Eliminar cuentas Existentes')
-    print('5 - Salir de la Aplicación ')
-
+    print('5 - Listar TODOS los Clientes/Cuentas')
+    print('6 - Salir de la Aplicación ')
 
 def agregar_cuenta(gestion,tipo_cuenta):
     try:
@@ -99,6 +99,8 @@ def eliminar_cuenta(self):
     except Exception as error:
         print(f'Error al intentar eliminar la cuenta: {error}')
 
+def listar_cuentas(self):
+    gestionar_cuenta.listar_todas_las_cuentas()
 
 if __name__ == '__main__':
     gestionar_cuenta = GestionCuentas()
@@ -116,7 +118,10 @@ if __name__ == '__main__':
         elif opcion == '4':
             eliminar_cuenta(gestionar_cuenta)
         elif opcion == '5':
+            listar_cuentas(gestionar_cuenta)
+        elif opcion == '6':
             print(' === FINALIZANDO APLICACION === ')
             break
         else:
             print('opcion no válida')
+
